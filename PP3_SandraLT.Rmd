@@ -1,0 +1,123 @@
+---
+title: "Práctica Programada 1"
+author: "Sandra López Torres"
+date: "2023-11-04"
+editor_options: 
+  markdown: 
+    wrap: 72
+  chunk_output_type: console
+---
+
+```{r}
+library(shiny)
+library(shinydashboard)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+library(gapminder)
+library(readr)
+```
+
+1. Cargar los datos
+```{r}
+datos_spotify <- readr::read_csv("datos1/spotify_2000_2023.csv", skip = 1)
+```
+
+
+```{r}
+datos_spotify <- readr::read_csv("datos1/spotify_2000_2023.csv", skip = 1)
+
+ui <- dashboardPage(
+  
+  dashboardHeader(title = "Análisis de spotify"),
+  
+  dashboardSidebar(
+    selectInput("year", "Selecciona el año:", unique(datos_spotify$year)),
+    selectInput("genre", "Selecciona el género:", unique(datos_spotify$top_genre)),
+    downloadButton("downloadData", "Descargar Datos")
+    
+  ), 
+  
+  dashboardBody() 
+)
+
+server <- function(input, output) {
+  
+  output$downloadData <- downloadHandler(
+    filename = function() {
+      paste("datos_spotify_", input$year, "_", input$top_genre, ".csv", sep = "")
+    },
+    content = function(file) {
+      write.csv(filtered_data(), file)
+    }
+  )
+  
+}
+
+# App
+shinyApp(ui = ui, server = server)
+```
+
+```{r}
+datos_spotify <- readr::read_csv("datos1/spotify_2000_2023.csv", skip = 1)
+
+# Define la interfaz de usuario (UI)
+ui <- dashboardPage(
+  dashboardHeader(title = "Análisis de Spotify"),
+  
+  dashboardSidebar(
+    selectInput("year", "Selecciona el año:", unique(datos_spotify$year)),
+    selectInput("genre", "Selecciona el género:", unique(datos_spotify$top_genre)),
+    downloadButton("downloadData", "Descargar Datos")
+  ), 
+  
+  dashboardBody(
+    fluidRow(
+      box(
+        plotlyOutput("scatterPlot")
+      ),
+      box(
+        DTOutput("table")
+      )
+    )
+  )
+)
+
+# Define el servidor
+server <- function(input, output) {
+  
+  filtered_data <- reactive({
+    datos_spotify %>%
+      filter(year == input$year, top_genre == input$genre)
+  })
+  
+  output$scatterPlot <- renderPlotly({
+    plot_ly(filtered_data(), x = ~bpm, y = ~popularity, type = "scatter", mode = "markers",
+            marker = list(size = 10, opacity = 0.7)) %>%
+      layout(title = "Relación entre BPM y Popularidad",
+             xaxis = list(title = "BPM"),
+             yaxis = list(title = "Popularidad"))
+  })
+  
+  output$table <- renderDT({
+    filtered_data()
+  })
+  
+  output$downloadData <- downloadHandler(
+    filename = function() {
+      paste("datos_spotify_", input$year, "_", input$genre, ".csv", sep = "")
+    },
+    content = function(file) {
+      write.csv(filtered_data(), file)
+    }
+  )
+  
+}
+
+# Ejecutar la aplicación
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
