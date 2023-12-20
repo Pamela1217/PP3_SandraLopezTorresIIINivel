@@ -9,115 +9,87 @@ editor_options:
 ---
 
 ```{r}
-library(shiny)
-library(shinydashboard)
-library(dplyr)
-library(readxl)
-library(ggplot2)
-library(gapminder)
-library(readr)
-```
-
-1. Cargar los datos
-```{r}
-datos_spotify <- readr::read_csv("datos1/spotify_2000_2023.csv", skip = 1)
-```
-
-
-```{r}
-datos_spotify <- readr::read_csv("datos1/spotify_2000_2023.csv", skip = 1)
-
 ui <- dashboardPage(
-  
-  dashboardHeader(title = "Análisis de spotify"),
-  
-  dashboardSidebar(
-    selectInput("year", "Selecciona el año:", unique(datos_spotify$year)),
-    selectInput("genre", "Selecciona el género:", unique(datos_spotify$top_genre)),
-    downloadButton("downloadData", "Descargar Datos")
-    
-  ), 
-  
-  dashboardBody() 
-)
-
-server <- function(input, output) {
-  
-  output$downloadData <- downloadHandler(
-    filename = function() {
-      paste("datos_spotify_", input$year, "_", input$top_genre, ".csv", sep = "")
-    },
-    content = function(file) {
-      write.csv(filtered_data(), file)
-    }
-  )
-  
-}
-
-# App
-shinyApp(ui = ui, server = server)
-```
-
-```{r}
-datos_spotify <- readr::read_csv("datos1/spotify_2000_2023.csv", skip = 1)
-
-# Define la interfaz de usuario (UI)
-ui <- dashboardPage(
+  skin = "blue",
   dashboardHeader(title = "Análisis de Spotify"),
   
   dashboardSidebar(
-    selectInput("year", "Selecciona el año:", unique(datos_spotify$year)),
-    selectInput("genre", "Selecciona el género:", unique(datos_spotify$top_genre)),
-    downloadButton("downloadData", "Descargar Datos")
-  ), 
+    selectInput("anyo", "Año", choices = NULL, selected = NULL),
+    selectInput("genero", "Género:", choices = NULL, selected = NULL),
+    fluidRow(
+      column(width = 12, offset = 2,
+             downloadButton("download_pdf", "Descargar PDF")
+      )
+    )
+  ),
   
   dashboardBody(
     fluidRow(
-      box(
-        plotlyOutput("scatterPlot")
+      column(
+        width = 6,
+        selectInput("variable_x",
+                    label = "Seleccione una variable:",
+                    choices = c("bpm", "energy", "danceability", "dB","liveness", "acousticness", "speechiness")),
+        selectInput("variable_y",
+                    label = "Seleccione Popularidad:",
+                    choices = c("popularity" )),
+        plotlyOutput("dispersion"),
+        theme = shinythemes::shinytheme("simplex")
       ),
-      box(
-        DTOutput("table")
+      column(
+        width = 6,
+        selectInput("variable_x_table",
+                    label = "Seleccione una variable:",
+                    choices = c("bpm", "energy", "danceability", "dB","liveness", "acousticness", "speechiness")),
+        dataTableOutput("tabla")  # Utilizando renderDataTable
       )
     )
   )
 )
 
-# Define el servidor
-server <- function(input, output) {
+server <- function(input, output, session) {
   
-  filtered_data <- reactive({
-    datos_spotify %>%
-      filter(year == input$year, top_genre == input$genre)
+  spotify_data <- read.csv2("datos1/spotify_2000_2023.csv")
+  
+  observe({
+    updateSelectInput(session, "anyo", choices = seq(2000, 2023), selected = 2023)
+    updateSelectInput(session, "genero", choices = unique(spotify_data$top.genre))
   })
   
-  output$scatterPlot <- renderPlotly({
-    plot_ly(filtered_data(), x = ~bpm, y = ~popularity, type = "scatter", mode = "markers",
-            marker = list(size = 10, opacity = 0.7)) %>%
-      layout(title = "Relación entre BPM y Popularidad",
-             xaxis = list(title = "BPM"),
-             yaxis = list(title = "Popularidad"))
+  output$tabla <- renderDataTable({
+    datos_resumen <- spotify_data |>
+      filter(year == input$anyo, top.genre == input$genero)
+    datos_resumen
   })
   
-  output$table <- renderDT({
-    filtered_data()
+  output$dispersion <- renderPlotly({
+    datos_filtrados <- spotify_data |>
+      filter(year == input$anyo, top.genre == input$genero)
+    
+    plot_ly(data = datos_filtrados, x = ~get(input$variable_x), y = ~get(input$variable_y), color = ~popularity) |>
+      add_markers() |>
+      layout(title = "Relación entre características musicales y popularidad o duración",
+             xaxis = list(title = input$variable_x),
+             yaxis = list(title = input$variable_y))
   })
   
-  output$downloadData <- downloadHandler(
+  output$download_pdf <- downloadHandler(
     filename = function() {
-      paste("datos_spotify_", input$year, "_", input$genre, ".csv", sep = "")
+      paste0("Datos Spotify", ".csv")
     },
+    
     content = function(file) {
-      write.csv(filtered_data(), file)
+      tabla_genero <- spotify_data |>
+        filter(year == input$anyo, top.genre == input$genero)
+      write.csv(tabla_genero, file)
     }
   )
-  
 }
 
-# Ejecutar la aplicación
-shinyApp(ui = ui, server = server)
-
+shinyApp(ui, server)
 ```
+
+
 
 
 
